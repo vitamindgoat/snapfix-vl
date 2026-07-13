@@ -1,0 +1,28 @@
+{
+  "name": "snapfix-example",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sync-dataset": "node scripts/sync_dataset.mjs",
+    "dev": "npm run sync-dataset && next dev -p 3010",
+    "build": "npm run sync-dataset && next build",
+    "deploy": "next build && npx --yes wrangler pages deploy out --project-name snapfix",
+    "start": "next start -p 3010",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

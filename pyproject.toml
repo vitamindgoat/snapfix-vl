@@ -1,0 +1,53 @@
+[project]
+dependencies = [
+    "transformers",
+    "qwen-vl-utils",
+    "accelerate",
+    "pillow",
+    "sentence-transformers",
+    "httpx",
+    "numpy",
+    "huggingface-hub",
+    "hf-transfer",
+]
+name = "snapfix"
+requires-python = ">=3.12,<3.13"
+version = "0.1.0"
+
+[tool.malex]
+framework = "transformers"
+frontend = "nextjs"
+gpu = true
+http-prefix = "/snapfix"
+instance-type = "A100 SXM4"
+malex-email = "alex@rybitskyi.com"
+model = "Qwen/Qwen2-VL-7B-Instruct"
+pages-domain = "snapfix.malex.ai"
+pages-project = "snapfix"
+served-model-name = "snapfix-qwen-vl"
+web-script = "server/snapfix_server.py"
+
+[tool.uv]
+exclude-dependencies = [
+    "cuda-bindings",
+    "cuda-pathfinder",
+    "cuda-toolkit",
+    "nvidia-cublas",
+    "nvidia-cuda-cupti",
+    "nvidia-cuda-nvrtc",
+    "nvidia-cuda-runtime",
+    "nvidia-cudnn-cu13",
+    "nvidia-cufft",
+    "nvidia-cufile",
+    "nvidia-curand",
+    "nvidia-cusolver",
+    "nvidia-cusparse",
+    "nvidia-cusparselt-cu13",
+    "nvidia-nccl-cu13",
+    "nvidia-nvjitlink",
+    "nvidia-nvshmem-cu13",
+    "nvidia-nvtx",
+    "torch",
+    "torchvision",
+    "triton",
+]
