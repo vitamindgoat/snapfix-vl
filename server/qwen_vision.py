@@ -8,7 +8,9 @@ from __future__ import annotations
 import base64
 import io
 import os
+import threading
 from functools import lru_cache
+from typing import Any
 
 import torch
 from PIL import Image
@@ -17,13 +19,43 @@ from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
 
 DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
+_ready = threading.Event()
+_error_lock = threading.Lock()
+_error: str | None = None
+
+
+def _malex_models() -> list[str]:
+    raw = (os.environ.get("MALEX_MODELS") or "").strip()
+    if not raw:
+        return []
+    if raw.startswith("["):
+        try:
+            import json
+
+            arr = json.loads(raw)
+            if isinstance(arr, list):
+                return [str(x).strip() for x in arr if str(x).strip()]
+        except Exception:
+            return []
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+def _pick_vision_model(models: list[str]) -> str | None:
+    for mid in models:
+        u = mid.upper()
+        if "/QWEN" in u or "-VL" in u or "INSTRUCT" in u:
+            return mid
+    return models[0] if models else None
+
 
 def _model_id() -> str:
-    return (
-        os.environ.get("MALEX_MODEL")
-        or os.environ.get("SNAPFIX_VISION_MODEL")
-        or DEFAULT_MODEL
+    explicit = (
+        os.environ.get("SNAPFIX_VISION_MODEL") or os.environ.get("MALEX_MODEL") or ""
     ).strip()
+    if explicit:
+        return explicit
+    picked = _pick_vision_model(_malex_models())
+    return picked or DEFAULT_MODEL
 
 
 def _resolve_device() -> str:
@@ -48,6 +80,26 @@ def _decode_image_b64(image_b64: str) -> Image.Image:
     return Image.open(io.BytesIO(data)).convert("RGB")
 
 
+def _set_error(msg: str) -> None:
+    global _error
+    with _error_lock:
+        _error = msg
+
+
+def is_ready() -> bool:
+    return _ready.is_set()
+
+
+def status() -> dict[str, Any]:
+    with _error_lock:
+        err = _error
+    return {
+        "ready": _ready.is_set(),
+        "model": _model_id(),
+        "error": err,
+    }
+
+
 @lru_cache(maxsize=1)
 def _load_stack() -> tuple[Qwen2VLForConditionalGeneration, AutoProcessor, str]:
     model_id = _model_id()
@@ -65,11 +117,19 @@ def _load_stack() -> tuple[Qwen2VLForConditionalGeneration, AutoProcessor, str]:
 
     processor = AutoProcessor.from_pretrained(model_id)
     print(f"[+] Qwen2-VL ready ({device}).")
+    with _error_lock:
+        global _error
+        _error = None
+    _ready.set()
     return model, processor, device
 
 
 def preload() -> None:
-    _load_stack()
+    try:
+        _load_stack()
+    except Exception as e:
+        _set_error(repr(e))
+        print(f"[!] Qwen2-VL preload failed: {e}")
 
 
 def analyze_image(

@@ -5,7 +5,7 @@ import {
   useMalexInstanceStatus,
   type DisplayStatus,
 } from "@/hooks/useMalexInstanceStatus";
-import { bootstrapMalexGpu } from "@/lib/malex-bootstrap";
+import { bootstrapMalexGpu } from "@/lib/malex";
 
 /** Keep "Starting…" visible while instance_status SSE catches up after bootstrap. */
 const BOOTSTRAP_STATUS_DELAY_MS = 5000;

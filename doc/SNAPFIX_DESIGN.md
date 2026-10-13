@@ -144,7 +144,17 @@ ModernBERT hybrid rerank (`query` + `trade` + `candidates[]` → ranked `scores`
 
 ### `GET /snapfix/health`
 
-Liveness: `{ "ok": true }`.
+Readiness for Malex GPU worker `Ready` reporting. Returns **200** only when both Qwen2-VL and ModernBERT have finished loading; otherwise **503**.
+
+```json
+{
+  "ok": true,
+  "vision": { "ready": true, "model": "Qwen/Qwen2-VL-7B-Instruct", "error": null },
+  "rerank": { "ready": true, "model": "answerdotai/ModernBERT-large", "error": null }
+}
+```
+
+While either model is still loading (or failed), `ok` is `false` and the corresponding `error` may be set. The worker keeps the instance non-`Ready` until this returns 200.
 
 ### Error behavior
 
@@ -176,9 +186,10 @@ Page: [`src/app/page.tsx`](../src/app/page.tsx). Single-column mobile-friendly l
 
 ### Flow
 
-1. **Input** — image upload (or pick from `dataset/` via `/dataset/manifest.json`), location text (default `Folsom CA 95630`), **Proceed**.
-2. **Request** — `POST` via `getMalexSnapfixContractorsUrl()` in [`src/lib/malex-edge.ts`](../src/lib/malex-edge.ts). Production uses same-origin `/snapfix/contractors`; `next dev` uses `/malex-edge-proxy/` rewrites to `MALEX_EDGE_URL`.
-3. **Display** — analysis fields; up to 5 contractors (`name`, `phone`, `rating`, `distance`, `reason`); `search_warning` / `rerank_warning` when present. GPU status via `MalexInstanceStatusPill`.
+1. **Input** — image upload (or pick from `dataset/` via `/dataset/manifest.json`), location text (default `Folsom CA 95630`), **Proceed**. Optional **Sign in** (Track B) via `POST /_malex/auth/login`.
+2. **Auth** — [`src/lib/malex.ts`](../src/lib/malex.ts): prefer login JWT → `POST /_malex/ui/session` (Pages `_worker.js` + Pages secret; Track C) → local JWT refresh / `NEXT_PUBLIC_MALEX_*` exchange for `next dev` only (never bake bootstrap into production).
+3. **Request** — same-origin `POST /snapfix/contractors`. Production Pages proxies `/_malex/*` and `/snapfix/*` to Malex Edge; `next dev` rewrites those paths when `MALEX_EDGE_URL` is set.
+4. **Display** — analysis fields; up to 5 contractors (`name`, `phone`, `rating`, `distance`, `reason`); `search_warning` / `rerank_warning` when present. GPU status via `MalexInstanceStatusPill` (`GET /_malex/instance_status` SSE; **Run** → `POST /_malex/planner/bootstrap`).
 
 ### Types
 

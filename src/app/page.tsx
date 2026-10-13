@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getMalexSnapfixContractorsUrl } from "@/lib/malex-edge";
-import { ensureMalexAccessToken, malexAuthHeaders } from "@/lib/malex-token";
+import { ensureMalexAccessToken, malexAuthHeaders } from "@/lib/malex";
 import { GpuLoadingBanner } from "@/components/GpuLoadingBanner";
 import { MalexInstanceStatusPill } from "@/components/MalexInstanceStatusPill";
+import { MalexLoginBar } from "@/components/MalexLoginBar";
 
 type SnapfixAnalysis = {
   detected: boolean;
@@ -149,7 +149,7 @@ export default function SnapfixPage() {
 
     try {
       await ensureMalexAccessToken();
-      const res = await fetch(getMalexSnapfixContractorsUrl(), {
+      const res = await fetch("/snapfix/contractors", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...malexAuthHeaders() },
         body: JSON.stringify({
@@ -197,12 +197,14 @@ export default function SnapfixPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6 min-h-screen bg-white text-black">
+      <MalexLoginBar>
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-bold">Snapfix Diagnosis</h1>
         <MalexInstanceStatusPill />
       </div>
       <p className="text-sm text-gray-600">
-        Image → Qwen vision → Google Places candidates → ModernBERT rerank via Malex GPU worker.
+        Algorithm: 
+        Input Image → Qwen vision → Google Places candidates → ModernBERT rerank via Malex GPU worker.
         Verify phone/hours on Google Maps before calling.
       </p>
 
@@ -336,6 +338,7 @@ export default function SnapfixPage() {
           )}
         </div>
       )}
+      </MalexLoginBar>
     </div>
   );
 }

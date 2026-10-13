@@ -15,17 +15,22 @@ requires-python = ">=3.12,<3.13"
 version = "0.1.0"
 
 [tool.malex]
+entrypoint = "python3 server/snapfix_server.py"
 framework = "transformers"
 frontend = "nextjs"
 gpu = true
 http-prefix = "/snapfix"
-instance-type = "A100 SXM4"
-malex-email = "alex@rybitskyi.com"
+init-timeout-mins = 30
+instance-types = ["a100_sxm4_80gb"]
+malex-email = "alex.rybitskyi1@gmail.com"
 model = "Qwen/Qwen2-VL-7B-Instruct"
 pages-domain = "snapfix.malex.ai"
 pages-project = "snapfix"
 served-model-name = "snapfix-qwen-vl"
-web-script = "server/snapfix_server.py"
+image="ghcr.io/malexai/vllm-openai"
+
+[tool.malex.env]
+SNAPFIX_RERANK_DEVICE = "cuda"
 
 [tool.uv]
 exclude-dependencies = [

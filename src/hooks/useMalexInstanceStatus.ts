@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMalexInstanceStatusUrl } from "@/lib/malex-edge";
-import { ensureMalexAccessToken, malexAuthHeaders } from "@/lib/malex-token";
+import {
+  ensureMalexAccessToken,
+  malexAuthHeaders,
+  withMalexAuthQuery,
+} from "@/lib/malex";
 
 export type VastStatus =
   | "init"
@@ -105,7 +108,7 @@ export function useMalexInstanceStatus(): {
 
     void (async () => {
       await ensureMalexAccessToken();
-      const url = getMalexInstanceStatusUrl();
+      const url = withMalexAuthQuery("/_malex/instance_status");
 
       try {
         const res = await fetch(url, {
@@ -125,11 +128,7 @@ export function useMalexInstanceStatus(): {
         if (!cancelled) {
           const base = e instanceof Error ? e.message : "Initial fetch failed";
           const hint =
-            typeof window !== "undefined" &&
-            (window.location.hostname === "localhost" ||
-              window.location.hostname === "127.0.0.1")
-              ? " Use `npm run dev` in `examples/snapfix` with MALEX_EDGE_URL so /malex-edge-proxy rewrites apply."
-              : " Ensure Malex Edge is reachable on this origin for GET /_malex/instance_status.";
+            " Ensure Malex Edge is reachable on this origin for GET /_malex/instance_status (set MALEX_EDGE_URL for next dev rewrites).";
           setLastError(
             base === "Failed to fetch" || base.includes("NetworkError")
               ? `${base}.${hint}`

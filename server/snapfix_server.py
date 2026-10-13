@@ -5,7 +5,7 @@ SNAPFIX tenant HTTP server (deployed with examples/snapfix via R2).
 Routes (no /_malex prefix):
   POST /snapfix/contractors  — vision → Places → rerank → response
   POST /snapfix/rerank       — ModernBERT hybrid rerank
-  GET  /snapfix/health       — liveness
+  GET  /snapfix/health       — readiness (200 only when Qwen2-VL + ModernBERT loaded)
 
 Config from environment (project .env sourced by entrypoint.sh):
   GOOGLE_PLACES_API_KEY, SNAPFIX_VISION_MODEL, SNAPFIX_VISION_DEVICE,
@@ -29,12 +29,15 @@ from sentence_transformers import SentenceTransformer
 from typing import Any
 
 
-
 MAX_IMAGE_PAYLOAD_BYTES = 6 * 1024 * 1024
 HOST = os.environ.get("MALEX_TENANT_HTTP_BIND", "127.0.0.1")
 PORT = int(os.environ.get("MALEX_TENANT_HTTP_PORT", "8790"))
-RERANK_MODEL = os.environ.get("MALEX_SNAPFIX_RERANK_MODEL", "answerdotai/ModernBERT-large")
+RERANK_MODEL = "answerdotai/ModernBERT-large"
 RERANK_DEVICE = os.environ.get("SNAPFIX_RERANK_DEVICE", "cpu").strip() or "cpu"
+
+_rerank_ready = threading.Event()
+_rerank_error_lock = threading.Lock()
+_rerank_error: str | None = None
 
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -85,12 +88,56 @@ def _hybrid(sim: float, rating: Any, dist_mi: Any) -> float:
     )
 
 
+def _set_rerank_error(msg: str) -> None:
+    global _rerank_error
+    with _rerank_error_lock:
+        _rerank_error = msg
+
+
+def rerank_is_ready() -> bool:
+    return _rerank_ready.is_set()
+
+
+def rerank_status() -> dict[str, Any]:
+    with _rerank_error_lock:
+        err = _rerank_error
+    return {
+        "ready": _rerank_ready.is_set(),
+        "model": RERANK_MODEL,
+        "error": err,
+    }
+
+
+def models_ready() -> bool:
+    return qwen_vision.is_ready() and rerank_is_ready()
+
+
+def health_payload() -> dict[str, Any]:
+    return {
+        "ok": models_ready(),
+        "vision": qwen_vision.status(),
+        "rerank": rerank_status(),
+    }
+
+
 @lru_cache(maxsize=1)
 def _encoder():
     print(f"[+] Loading rerank model {RERANK_MODEL} on {RERANK_DEVICE} …")
     enc = SentenceTransformer(RERANK_MODEL, device=RERANK_DEVICE)
     print(f"[+] rerank encoder ready ({RERANK_DEVICE}).")
+    with _rerank_error_lock:
+        global _rerank_error
+        _rerank_error = None
+    _rerank_ready.set()
     return enc
+
+
+def _preload_rerank() -> None:
+    try:
+        _encoder()
+    except Exception as e:
+        _set_rerank_error(repr(e))
+        print(f"[!] rerank preload failed: {e}")
 
 
 def _encode_batch(texts: list[str]) -> np.ndarray:
@@ -529,7 +576,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path in ("/snapfix/health", "/health"):
-            self._send_json(200, {"ok": True})
+            body = health_payload()
+            self._send_json(200 if body["ok"] else 503, body)
             return
         self._send_json(404, {"error": "not_found"})
 
@@ -570,9 +618,9 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     server = HTTPServer((HOST, PORT), Handler)
     print(f"[+] SNAPFIX tenant HTTP http://{HOST}:{PORT} (/snapfix/contractors, /snapfix/rerank)")
-    print("[+] Pre-loading rerank model in background (first rerank may be slower)...")
-    threading.Thread(target=_encoder, name="snapfix-rerank-preload", daemon=True).start()
-    print("[+] Pre-loading Qwen2-VL in background (first request may wait if still loading)...")
+    print("[+] Pre-loading rerank model in background…")
+    threading.Thread(target=_preload_rerank, name="snapfix-rerank-preload", daemon=True).start()
+    print("[+] Pre-loading Qwen2-VL in background…")
     threading.Thread(target=qwen_vision.preload, name="snapfix-vision-preload", daemon=True).start()
     server.serve_forever()
 

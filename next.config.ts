@@ -16,12 +16,15 @@ const nextConfig: NextConfig = {
       return [];
     }
     return [
+      // Local next.dev: proxy Edge paths. Production Pages `_worker.js` serves
+      // POST /_malex/ui/session from the Pages secret; Edge has no such route, so
+      // the client falls back to JWT refresh / local bootstrap exchange.
       {
-        source: "/malex-edge-proxy/_malex/:path*",
+        source: "/_malex/:path*",
         destination: `${malexEdgeOrigin}/_malex/:path*`,
       },
       {
-        source: "/malex-edge-proxy/snapfix/:path*",
+        source: "/snapfix/:path*",
         destination: `${malexEdgeOrigin}/snapfix/:path*`,
       },
     ];
